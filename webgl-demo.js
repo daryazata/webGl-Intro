@@ -86,8 +86,8 @@ void main(void) {
     deltaTime = now - then;
     then = now;
 
-    drawScene(gl, programInfo, buffers, squareRotation);
-    squareRotation += deltaTime;
+    drawScene(gl, programInfo, buffers, cubeRotation);
+    cubeRotation += deltaTime;
 
     requestAnimationFrame(render);
   }
@@ -150,5 +150,5 @@ function loadShader(gl, type, source) {
   return shader;
 }
 
-let squareRotation = 0.0;
+let cubeRotation = 0.0;
 let deltaTime = 0;
