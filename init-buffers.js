@@ -1,11 +1,12 @@
 function initBuffers(gl) {
   const positionBuffer = initPositionBuffer(gl);
-  const colorBuffer = initColorBuffer(gl);
+  const textureCoordBuffer = initTextureBuffer(gl);
+
   const indexBuffer = initIndexBuffer(gl);
 
   return {
     position: positionBuffer,
-    color: colorBuffer,
+    textureCoord: textureCoordBuffer,
     indices: indexBuffer,
   };
 }
@@ -46,33 +47,6 @@ function initPositionBuffer(gl) {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
   return positionBuffer;
-}
-
-function initColorBuffer(gl) {
-  const faceColors = [
-    [1.0, 0.5, 0.31, 1.0], // Front face: coral
-    [1.0, 0.84, 0.0, 1.0], // Back face: gold
-    [0.56, 0.93, 0.56, 1.0], // Top face: light green
-    [0.0, 0.75, 1.0, 1.0], // Bottom face: deep blue sky
-    [0.93, 0.51, 0.93, 1.0], // Right face: violett
-    [0.82, 0.41, 0.12, 1.0], // Left face: choco
-  ];
-
-  // Convert the array of colors into a table for all the vertices.
-
-  var colors = [];
-
-  for (var j = 0; j < faceColors.length; ++j) {
-    const c = faceColors[j];
-    // Repeat each color four times for the four vertices of the face
-    colors = colors.concat(c, c, c, c);
-  }
-
-  const colorBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
-
-  return colorBuffer;
 }
 
 function initIndexBuffer(gl) {
@@ -131,4 +105,32 @@ function initIndexBuffer(gl) {
   );
 
   return indexBuffer;
+}
+
+function initTextureBuffer(gl) {
+  const textureCoordBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer);
+
+  const textureCoordinates = [
+    // Front
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Back
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Top
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Bottom
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Right
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Left
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+  ];
+
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array(textureCoordinates),
+    gl.STATIC_DRAW
+  );
+
+  return textureCoordBuffer;
 }

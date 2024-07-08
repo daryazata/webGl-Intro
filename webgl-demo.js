@@ -27,29 +27,35 @@ function main() {
   // Vertex shader program
 
   const vsSource = `
-attribute vec4 aVertexPosition;
-attribute vec4 aVertexColor;
+  attribute vec4 aVertexPosition;
+  attribute vec2 aTextureCoord;
 
-uniform mat4 uModelViewMatrix;
-uniform mat4 uProjectionMatrix;
+  uniform mat4 uModelViewMatrix;
+  uniform mat4 uProjectionMatrix;
 
-varying lowp vec4 vColor;
+  varying highp vec2 vTextureCoord;
 
-void main(void) {
-  gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-  vColor = aVertexColor;
-}
+  void main(void) {
+    gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+    vTextureCoord = aTextureCoord;
+  }
 `;
 
   // Fragment shader program
-
+  // note: the suggested code (for webgl 3.0) throws error
   const fsSource = `
-    varying lowp vec4 vColor;
 
-    void main(void) {
-      gl_FragColor = vColor;
-    }
-  `;
+precision mediump float;
+
+varying highp vec2 vTextureCoord;
+uniform sampler2D uSampler;
+
+void main(void) {
+    gl_FragColor = texture2D(uSampler, vTextureCoord);
+}
+
+
+`;
 
   // Initialize a shader program; this is where all the lighting
   // for the vertices and so forth is established.
@@ -63,7 +69,7 @@ void main(void) {
     program: shaderProgram,
     attribLocations: {
       vertexPosition: gl.getAttribLocation(shaderProgram, "aVertexPosition"),
-      vertexColor: gl.getAttribLocation(shaderProgram, "aVertexColor"),
+      textureCoord: gl.getAttribLocation(shaderProgram, "aTextureCoord"),
     },
     uniformLocations: {
       projectionMatrix: gl.getUniformLocation(
@@ -71,6 +77,7 @@ void main(void) {
         "uProjectionMatrix"
       ),
       modelViewMatrix: gl.getUniformLocation(shaderProgram, "uModelViewMatrix"),
+      uSampler: gl.getUniformLocation(shaderProgram, "uSampler"),
     },
   };
 
@@ -78,15 +85,36 @@ void main(void) {
   // objects we'll be drawing.
   const buffers = initBuffers(gl);
 
+  // Load texture
+  const texture = loadTexture(gl, "cubetexture.jpg");
+  // Flip image pixels into the bottom-to-top order that WebGL expects.
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+  // Setze die Größe des Canvas auf die volle Fenstergröße
+  // und passe an die tatsächliche Pixeldichte an
+  function resizeCanvasToDisplaySize(canvas) {
+    const displayWidth = canvas.clientWidth * window.devicePixelRatio; //window.devicePixelRatio =tatsächliche Pixeldichte
+    const displayHeight = canvas.clientHeight * window.devicePixelRatio;
+
+    if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+      canvas.width = displayWidth;
+      canvas.height = displayHeight;
+    }
+  }
+
   let then = 0;
 
   // Draw the scene repeatedly
   function render(now) {
+    resizeCanvasToDisplaySize(canvas);
+    // gl.viewport: Stellt sicher, dass der WebGL-Rendering-Bereich die gesamte canvas-Fläche abdeckt.
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
     now *= 0.001; // convert to seconds
     deltaTime = now - then;
     then = now;
 
-    drawScene(gl, programInfo, buffers, cubeRotation);
+    drawScene(gl, programInfo, buffers, texture, cubeRotation);
     cubeRotation += deltaTime;
 
     requestAnimationFrame(render);
@@ -152,3 +180,96 @@ function loadShader(gl, type, source) {
 
 let cubeRotation = 0.0;
 let deltaTime = 0;
+
+//
+// Initialize a texture and load an image.
+// When the image finished loading copy it into the texture.
+//
+function loadTexture(gl, url) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+
+  // Because images have to be downloaded over the internet
+  // they might take a moment until they are ready.
+  // Until then put a single pixel in the texture so we can
+  // use it immediately. When the image has finished downloading
+  // we'll update the texture with the contents of the image.
+  const level = 0;
+  const internalFormat = gl.RGBA;
+  const width = 1;
+  const height = 1;
+  const border = 0;
+  const srcFormat = gl.RGBA;
+  const srcType = gl.UNSIGNED_BYTE;
+  const pixel = new Uint8Array([0, 0, 255, 255]); // opaque blue
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    level,
+    internalFormat,
+    width,
+    height,
+    border,
+    srcFormat,
+    srcType,
+    pixel
+  );
+
+  const image = new Image();
+  image.onload = () => {
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      level,
+      internalFormat,
+      srcFormat,
+      srcType,
+      image
+    );
+
+    // WebGL1 has different requirements for power of 2 images
+    // vs. non power of 2 images so check if the image is a
+    // power of 2 in both dimensions.
+    if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+      // Yes, it's a power of 2. Generate mips.
+      gl.generateMipmap(gl.TEXTURE_2D);
+    } else {
+      // No, it's not a power of 2. Turn off mips and set
+      // wrapping to clamp to edge
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }
+  };
+  image.src = url;
+
+  return texture;
+}
+
+function isPowerOf2(value) {
+  return (value & (value - 1)) === 0;
+}
+
+// some additional checks
+if (typeof WebGL2RenderingContext !== "undefined") {
+  console.log("WebGL 2.0 is supported.");
+} else {
+  console.log("WebGL 2.0 is not supported, using WebGL 1.0.");
+}
+
+// Versuche, einen WebGL 2.0 Kontext zu bekommen
+let gl = canvas.getContext("webgl2");
+if (!gl) {
+  // Fallback auf WebGL 1.0, wenn WebGL 2.0 nicht verfügbar ist
+  gl = canvas.getContext("webgl");
+}
+
+if (gl instanceof WebGL2RenderingContext) {
+  console.log("Running with WebGL 2.0 context");
+  // Verwende WebGL 2.0 spezifischen Code
+} else if (gl instanceof WebGLRenderingContext) {
+  console.log("Running with WebGL 1.0 context");
+  // Verwende WebGL 1.0 spezifischen Code
+} else {
+  console.error("WebGL is not supported by your browser.");
+}
+// checks end
